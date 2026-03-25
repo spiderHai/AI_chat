@@ -6,6 +6,9 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from .schemas import ChatRequest, ChatResponse, DocumentUploadResponse
 from .config import DOCUMENTS_PATH
+from .logger import get_logger
+
+logger = get_logger("routes")
 
 router = APIRouter()
 
@@ -21,6 +24,7 @@ async def chat(request: ChatRequest):
         response = await agent.invoke(request)
         return response
     except Exception as e:
+        logger.error("聊天请求失败", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -36,6 +40,7 @@ async def chat_stream(request: ChatRequest):
             # 发送结束标记
             yield f"data: {json.dumps({'done': True})}\n\n"
         except Exception as e:
+            logger.error("流式聊天失败", error=str(e), exc_info=True)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(
@@ -54,12 +59,14 @@ async def upload_document(file: UploadFile = File(...)):
         with open(file_path, "wb") as f:
             f.write(content)
         chunks_added = rag_manager.add_documents_from_file(file_path)
+        logger.info("文档上传成功", filename=file.filename, chunks=chunks_added)
         return DocumentUploadResponse(
             success=True,
             chunks_added=chunks_added,
             message=f"文档 {file.filename} 已成功添加，共 {chunks_added} 个文档块"
         )
     except Exception as e:
+        logger.error("文档上传失败", filename=file.filename, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -71,12 +78,14 @@ async def add_text(text: str, title: str = "未命名文档"):
             text,
             metadata={"title": title, "timestamp": datetime.now().isoformat()}
         )
+        logger.info("文本添加成功", title=title, chunks=chunks_added)
         return DocumentUploadResponse(
             success=True,
             chunks_added=chunks_added,
             message=f"文本已成功添加，共 {chunks_added} 个文档块"
         )
     except Exception as e:
+        logger.error("文本添加失败", title=title, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

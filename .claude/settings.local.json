@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(.venv/Scripts/pip install:*)"
+      "Bash(.venv/Scripts/pip install:*)",
+      "mcp__manon__manon_repos_list",
+      "mcp__manon__manon_search"
     ]
   }
 }
