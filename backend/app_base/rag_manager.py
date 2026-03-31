@@ -7,6 +7,9 @@ from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
 from .config import VECTOR_STORE_PATH
 from .embeddings import DashScopeEmbeddings
+from .logger import get_logger, Timer
+
+logger = get_logger("rag_manager")
 
 
 class RAGManager:
@@ -41,9 +44,9 @@ class RAGManager:
                     "faiss_index",
                     allow_dangerous_deserialization=True
                 )
-                print("✓ 向量数据库加载成功")
+                logger.info("向量数据库加载成功")
             except Exception as e:
-                print(f"✗ 向量数据库加载失败: {e}")
+                logger.error("向量数据库加载失败", error=str(e))
                 self.vector_store = None
 
     def add_documents_from_text(self, text: str, metadata: dict = None) -> int:
@@ -79,8 +82,12 @@ class RAGManager:
     def search(self, query: str, k: int = 3) -> List[Document]:
         """根据查询做相似度检索，返回最相关的 k 个文档块"""
         if self.vector_store is None:
+            logger.warning("检索跳过: 向量库为空")
             return []
-        return self.vector_store.similarity_search(query, k=k)
+        timer = Timer()
+        results = self.vector_store.similarity_search(query, k=k)
+        logger.info("检索完成", results_count=len(results), duration_ms=timer.elapsed_ms())
+        return results
 
     def get_stats(self) -> dict:
         """获取向量库统计信息"""

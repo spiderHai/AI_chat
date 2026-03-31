@@ -1,32 +1,35 @@
-"""数据模型定义"""
+"""Data models used by the app_skill04 service."""
 import operator
-from typing import Annotated, List
+from typing import Annotated, List, TypedDict
+
 from pydantic import BaseModel
-from typing import TypedDict
 
 
 class AgentState(TypedDict):
-    """LangGraph Agent 的状态定义 - 数据在节点间流转的载体"""
+    """State shared between LangGraph nodes."""
+
     user_id: str
     question: str
-    messages: Annotated[list, operator.add]  # 消息列表，自动累加
+    messages: Annotated[list, operator.add]
     thinking: str
     tool_to_use: str
     tool_result: str
-    rag_context: str       # RAG 检索到的上下文
+    rag_context: str
     final_response: str
     timestamp: str
 
 
 class ChatRequest(BaseModel):
-    """聊天请求"""
+    """Chat request payload."""
+
     question: str
     user_id: str = "default_user"
     use_rag: bool = True
 
 
 class ChatResponse(BaseModel):
-    """聊天响应"""
+    """Chat response payload."""
+
     answer: str
     thinking: str
     tools_used: List[str]
@@ -35,7 +38,23 @@ class ChatResponse(BaseModel):
 
 
 class DocumentUploadResponse(BaseModel):
-    """文档上传响应"""
+    """Document upload response."""
+
     success: bool
     chunks_added: int
     message: str
+
+
+class SkillRunRequest(BaseModel):
+    """Request body for running a local demo skill."""
+
+    skill_name: str
+    question: str = ""
+    context: str = ""
+
+
+class MCPDemoRequest(BaseModel):
+    """Request body for running the demo MCP flow."""
+
+    question: str
+    resource_uri: str = "project://architecture/rag_flow"

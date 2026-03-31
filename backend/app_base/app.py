@@ -1,4 +1,4 @@
-"""FastAPI 应用入口 - 生命周期管理 + CORS"""
+"""FastAPI 应用入口 - 生命周期管理 + CORS + 中间件"""
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -6,13 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import DOCUMENTS_PATH
 from .rag_manager import RAGManager
 from .agent import RAGChatAgent
+from .logger import get_logger
+from .middleware import RequestTraceMiddleware
 from . import routes
+
+logger = get_logger("app")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期：启动时初始化 RAG 系统"""
-    print("正在初始化 RAG 系统...")
+    logger.info("正在初始化 RAG 系统...")
     routes.rag_manager = RAGManager()
 
     # 如果向量数据库为空，自动加载 documents 目录下的文件
@@ -22,17 +26,17 @@ async def lifespan(app: FastAPI):
             for file_path in docs_dir.glob("*.txt"):
                 try:
                     count = routes.rag_manager.add_documents_from_file(str(file_path))
-                    print(f"✓ 已加载文档: {file_path.name} ({count} 个文档块)")
+                    logger.info("文档加载成功", file=file_path.name, chunks=count)
                 except Exception as e:
-                    print(f"✗ 加载文档失败 {file_path.name}: {e}")
+                    logger.error("文档加载失败", file=file_path.name, error=str(e))
 
     routes.agent = RAGChatAgent(routes.rag_manager)
     stats = routes.rag_manager.get_stats()
-    print(f"✓ RAG Agent 已初始化，向量库状态: {stats}")
+    logger.info("RAG Agent 初始化完成", **stats)
 
     yield
 
-    print("✓ RAG Agent 已关闭")
+    logger.info("RAG Agent 已关闭")
 
 
 app = FastAPI(
@@ -40,6 +44,13 @@ app = FastAPI(
     version="3.0.0",
     lifespan=lifespan
 )
+
+# 中间件注册顺序很重要！
+# 注册顺序和执行顺序是相反的（后注册的先执行）：
+#   注册: CORS → RequestTrace
+#   执行: RequestTrace（先）→ CORS → 路由处理 → CORS → RequestTrace（后）
+# 所以 RequestTrace 要在 CORS 之后注册，才能最先拦截请求
+app.add_middleware(RequestTraceMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
